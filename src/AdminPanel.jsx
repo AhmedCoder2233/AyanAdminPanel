@@ -22,7 +22,7 @@ export default function AdminPanel() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [productMsg, setProductMsg] = useState("");
 
-  const ADMIN_PASSWORD = "admin123";
+  const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 
   useEffect(() => {
     const stored = localStorage.getItem("admin_logged_in");
@@ -438,4 +438,5 @@ export default function AdminPanel() {
       </div>
     </div>
   );
+
 }
