@@ -21,8 +21,11 @@ export default function AdminPanel() {
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [productMsg, setProductMsg] = useState("");
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productsError, setProductsError] = useState("");
 
-  const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
+  const ADMIN_PASSWORD = "admin123";
 
   useEffect(() => {
     const stored = localStorage.getItem("admin_logged_in");
@@ -30,7 +33,10 @@ export default function AdminPanel() {
   }, []);
 
   useEffect(() => {
-    if (isLoggedIn) fetchOrders();
+    if (isLoggedIn) {
+      fetchOrders();
+      fetchProducts();
+    }
   }, [isLoggedIn]);
 
   const handleLogin = () => {
@@ -71,6 +77,31 @@ export default function AdminPanel() {
       setOrders([]);
     } finally {
       setLoadingOrders(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    setLoadingProducts(true);
+    setProductsError("");
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("id", { ascending: false });
+      
+      if (error) {
+        console.error("Fetch products error:", error);
+        throw error;
+      }
+      
+      console.log("Products fetched:", data);
+      setProducts(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch products:", err);
+      setProductsError(`Failed to fetch products: ${err.message || 'Unknown error'}`);
+      setProducts([]);
+    } finally {
+      setLoadingProducts(false);
     }
   };
 
@@ -204,9 +235,35 @@ export default function AdminPanel() {
         is_trending: false,
         image_url: "",
       });
+      fetchProducts();
     } catch (err) {
       console.error("Failed to add product:", err);
       setProductMsg(`Failed to add product: ${err.message || 'Unknown error'}`);
+    }
+  };
+
+  const deleteProduct = async (productId) => {
+    if (!window.confirm("Are you sure you want to delete this product?")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", productId);
+      
+      if (error) {
+        console.error("Delete product error:", error);
+        throw error;
+      }
+      
+      setProducts((prev) => prev.filter((p) => p.id !== productId));
+      setProductsError("Product deleted successfully!");
+      setTimeout(() => setProductsError(""), 3000);
+    } catch (err) {
+      console.error("Failed to delete product:", err);
+      setProductsError(`Failed to delete product: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -308,6 +365,68 @@ export default function AdminPanel() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* All Products Section */}
+      <div className="bg-gray-900 p-4 rounded-lg border border-amber-500/20 space-y-4 overflow-x-auto">
+        <h2 className="text-xl font-bold mb-4">All Products</h2>
+        {loadingProducts ? (
+          <p>Loading products...</p>
+        ) : productsError && !productsError.includes('successfully') ? (
+          <p className="text-red-500">{productsError}</p>
+        ) : products.length === 0 ? (
+          <p>No products found.</p>
+        ) : (
+          <div>
+            {productsError && productsError.includes('successfully') && (
+              <p className="text-green-400 mb-4">{productsError}</p>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {products.map((product) => (
+                <div key={product.id} className="bg-black/50 p-4 rounded-lg border border-amber-500/20 space-y-3">
+                  <div className="relative">
+                    <img 
+                      src={product.image_url} 
+                      alt={product.name} 
+                      className="w-full h-48 object-cover rounded"
+                    />
+                    <span className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-semibold ${product.product_type === 'watch' ? 'bg-blue-600' : 'bg-purple-600'}`}>
+                      {product.product_type}
+                    </span>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-bold text-lg">{product.name}</h3>
+                    <p className="text-sm text-gray-400">{product.slug}</p>
+                  </div>
+                  
+                  <p className="text-sm text-gray-300 line-clamp-2">{product.description}</p>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-amber-400 font-bold text-lg">${product.price}</span>
+                    <div className="text-sm">
+                      <span className="text-amber-400">★ {product.rating}</span>
+                      <span className="text-gray-400"> ({product.reviews})</span>
+                    </div>
+                  </div>
+                  
+                  {product.is_trending && (
+                    <span className="inline-block bg-amber-500 text-black px-2 py-1 rounded text-xs font-semibold">
+                      Trending
+                    </span>
+                  )}
+                  
+                  <button
+                    onClick={() => deleteProduct(product.id)}
+                    className="w-full bg-red-600 text-white px-3 py-2 rounded font-semibold hover:brightness-90"
+                  >
+                    Delete Product
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -438,5 +557,4 @@ export default function AdminPanel() {
       </div>
     </div>
   );
-
 }
